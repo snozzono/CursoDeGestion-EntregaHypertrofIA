@@ -6,9 +6,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY src/ ./src/
-COPY data/ ./data/
+COPY data/raw/ ./data/raw/
 COPY .env .
 
-RUN mkdir -p logs data/processed
+RUN mkdir -p logs data/processed data/errors
 
-CMD ["python", "src/1_ingest.py"]
+CMD ["python", "src/pipeline.py"]

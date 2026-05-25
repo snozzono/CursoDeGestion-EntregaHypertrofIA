@@ -3,3 +3,5 @@ logs/
 data/processed/
 __pycache__/
 .ipynb_checkpoint/
+data/errors/
+*.pyc

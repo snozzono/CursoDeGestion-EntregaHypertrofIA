@@ -1,0 +1,14 @@
+id_usuario,nombre_usuario,correo_electronico,nombre_sexo,nombre_pais,peso_corporal_kg,estatura_cm,edad,fecha_registro
+1,Carlos Rojas,carlos.rojas@gmail.com,Masculino,Chile,80.5,178.0,25,2024-01-10
+2,Valentina López,vlopez@hotmail.com,Femenino,Argentina,62.0,165.0,30,2024-02-15
+3,Sebastián Torres,sebas.torres@outlook.com,Masculino,Chile,90.0,182.0,28,2024-03-01
+4,Camila Pérez,cami.perez@gmail.com,Femenino,Colombia,58.5,162.0,22,2024-03-20
+5,Diego Muñoz,diegomunoz@gmail.com,Masculino,Chile,75.0,175.0,35,2024-04-05
+6,Fernanda Silva,fsilva@gmail.com,Femenino,México,67.0,170.0,27,2024-04-18
+7,Andrés Castillo,andres.castillo@gmail.com,Masculino,Chile,85.0,180.0,32,2024-05-02
+8,Javiera Morales,javi.morales@gmail.com,Femenino,Chile,55.0,158.0,24,2024-05-15
+9,,sinusuario@gmail.com,Masculino,Chile,70.0,172.0,29,2024-06-01
+10,Roberto Núñez,correo-invalido,Masculino,Chile,78.0,176.0,31,2024-06-10
+11,Lucía Fuentes,lucia@gmail.com,Femenino,Chile,60.0,163.0,-5,2024-06-15
+12,Patricio Vargas,pvargas@gmail.com,Masculino,Chile,500.0,179.0,40,2024/07/01
+13,Carlos Rojas,carlos.rojas@gmail.com,Masculino,Chile,80.5,178.0,25,2024-01-10

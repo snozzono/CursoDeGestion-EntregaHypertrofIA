@@ -1,9 +1,10 @@
-# HypertrophIA — Pipeline de Datos
+# 🏋️ HypertrophIA — Pipeline de Datos
 
-Pipeline de ingeniería de datos para un motor de IA especializado en musculación. Procesa un catálogo de ejercicios con base científica a través de cuatro etapas secuenciales: ingesta, limpieza/transformación, validación y carga a PostgreSQL.
+Pipeline de ingeniería de datos para un motor de IA especializado en musculación. Procesa catálogos de ejercicios, usuarios y rutinas a través de cuatro etapas secuenciales bajo principios DataOps.
 
 **Proyecto:** ITY1101 Gestión de Datos para IA — DuocUC  
-**Integrantes:** Francisco Salazar · Gabriel Durán · Martin Higuera
+**Integrantes:** Francisco Salazar · Gabriel Durán · Martin Higuera  
+**Profesor:** Héctor Andrés Morel Briones
 
 ---
 
@@ -15,13 +16,19 @@ hypertrophia/
 │   ├── 1_ingest.py          # Etapa 1: Ingesta
 │   ├── 2_transform.py       # Etapa 2: Limpieza y transformación
 │   ├── 3_validate.py        # Etapa 3: Validación estructural y semántica
-│   └── 4_load.py            # Etapa 4: Carga a PostgreSQL
+│   ├── 4_load.py            # Etapa 4: Carga a PostgreSQL
+│   └── pipeline.py          # Ejecutor secuencial del pipeline completo
 ├── data/
-│   ├── raw/
-│   │   └── ejercicios.csv   # Dataset fuente
-│   └── processed/           # Generado en tiempo de ejecución
-├── logs/                    # Generado en tiempo de ejecución
-├── docker-compose.yml       # PostgreSQL en contenedor
+│   ├── raw/                 # CSVs fuente + copias _raw generadas en ingesta
+│   ├── processed/           # CSVs limpios y validados (generado en ejecución)
+│   └── errors/              # Registros rechazados con motivo (generado en ejecución)
+├── logs/                    # Bitácoras por etapa (generado en ejecución)
+│   ├── ingest.log
+│   ├── transform.log
+│   ├── validation.log
+│   └── load_database.log
+├── HypertrophIA_Pipeline.ipynb  # Notebook de documentación y demo
+├── docker-compose.yml       # PostgreSQL local en contenedor
 ├── Dockerfile               # Containerización del pipeline
 ├── .env                     # Variables de entorno (no subir a git)
 ├── .gitignore
@@ -33,9 +40,9 @@ hypertrophia/
 ## Requisitos
 
 - Python 3.11+
-- Docker Desktop
+- Docker Desktop (para BD local)
 
-```
+```bash
 pip install -r requirements.txt
 ```
 
@@ -51,35 +58,39 @@ python-dotenv
 
 ## Configuración
 
-### 1. Variables de entorno
+### Opción A — PostgreSQL local (Docker)
 
-Crea un archivo `.env` en la raíz del proyecto:
-
-```
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=hypertrophia
-DB_USER=hypertrophia
-DB_PASSWORD=hypertrophia123
-```
-
-### 2. Levantar la base de datos
+Levanta el contenedor:
 
 ```bash
 docker compose up -d
 ```
 
-Verificar que el contenedor esté corriendo:
+`.env`:
+```
+DB_URL=postgresql://hypertrophia:hypertrophia123@localhost:5432/hypertrophia
+```
 
-```bash
-docker ps
+### Opción B — Supabase (nube)
+
+Crea un proyecto en [supabase.com](https://supabase.com), ve a **Connect → Transaction pooler** y copia la URI.
+
+`.env`:
+```
+DB_URL=postgresql://postgres.<project-id>:<password>@aws-1-<region>.pooler.supabase.com:6543/postgres
 ```
 
 ---
 
-## Ejecución del pipeline
+## Ejecución
 
-Cada etapa se ejecuta de forma independiente desde la raíz del proyecto:
+### Pipeline completo
+
+```bash
+python src/pipeline.py
+```
+
+### Por etapa
 
 ```bash
 python src/1_ingest.py
@@ -88,109 +99,131 @@ python src/3_validate.py
 python src/4_load.py
 ```
 
+---
+
+## Etapas del pipeline
+
 ### Etapa 1 — Ingesta (`1_ingest.py`)
 
-Copia el archivo fuente `data/raw/ejercicios.csv` a `data/raw/ejercicios_raw.csv` dejando el original intacto. Registra la operación en `logs/ingest.log`.
+Copia los archivos fuente a versiones `_raw` dejando los originales intactos. Registra tamaño y trazabilidad en `logs/ingest.log`.
 
-**Output esperado:**
 ```
-[OK] Ingesta completada -> data/raw/ejercicios_raw.csv
+[OK] ejercicios.csv -> ejercicios_raw.csv (1046 bytes)
+[OK] usuarios.csv -> usuarios_raw.csv (1139 bytes)
+[OK] rutinas.csv -> rutinas_raw.csv (1242 bytes)
+Ingesta completada: 3/3 archivos
 ```
 
 ### Etapa 2 — Limpieza y Transformación (`2_transform.py`)
-> 🚧 En desarrollo
 
-- Elimina duplicados
-- Reemplaza strings `'NULL'` y campos vacíos por `NaN`
-- Elimina filas sin `nombre` o `grupo_muscular_primario`
-- Rellena columnas opcionales con valores por defecto
-- Parsea rangos (`"3-4"`, `"8-12"`) extrayendo el valor mínimo
-- Calcula `volumen_total = series_min * repeticiones_min`
-- Exporta a `data/processed/ejercicios_clean.csv`
+- Elimina duplicados exactos
+- Normaliza `NULL` string y celdas vacías a `NaN`
+- Elimina filas sin campos obligatorios
+- Convierte tipos de datos (numéricos, fechas) con `errors='coerce'`
+- Loguea IDs eliminados por etapa
 
-### Etapa 3 — Validación (`3_validate.py`)
-> 🚧 En desarrollo
+```
+[-] dropna nombre/musculo: 2 eliminados | IDs: [11, 13]
+[-] coercion numerica: 1 eliminados | IDs: [14]
+[OK] ejercicios: 15 -> 12 registros
+[-] dropna nombre/correo: 1 eliminados | IDs: [9]
+[-] coercion numerica/fecha: 1 eliminados | IDs: [12]
+[OK] usuarios: 13 -> 11 registros
+[-] dropna nombre_rutina: 1 eliminados | IDs: [13]
+[-] coercion numerica/fecha: 2 eliminados | IDs: [10, 12]
+[OK] rutinas: 13 -> 10 registros
+```
 
-- Validación estructural: tipos de datos, formatos
-- Validación semántica: rangos lógicos de negocio
-- Separa registros válidos (`ejercicios_validos.csv`) e inválidos (`ejercicios_invalidos.csv`)
-- Registra observaciones en `logs/validation.log`
+### Etapa 3 — Validación Estructural y Semántica (`3_validate.py`)
 
-### Etapa 4 — Carga (`4_load.py`)
-> 🚧 En desarrollo
+Aplica reglas de negocio. Registros inválidos se desvían a `data/errors/` con motivo detallado.
 
-- Conecta a PostgreSQL vía SQLAlchemy
-- Crea tablas `ejercicios_clean` y `ejercicios_error` si no existen
-- Inserta registros válidos e inválidos en sus respectivas tablas
-- Registra la operación en `logs/load_database.log`
+| Dataset | Campo | Regla |
+|---------|-------|-------|
+| ejercicios | `porcentaje_estimulo` | Entre 0 y 100 |
+| ejercicios | `dificultad` | Entre 1 y 5 |
+| usuarios | `edad` | Entre 14 y 100 |
+| usuarios | `peso_corporal_kg` | Entre 30 y 300 |
+| usuarios | `estatura_cm` | Entre 100 y 250 |
+| usuarios | `correo_electronico` | Formato válido (regex) |
+| rutinas | `repeticiones_logradas` | Mayor a 0 |
+| rutinas | `peso_levantado_kg` | Entre 0 y 500 |
+| rutinas | `rpe` | Entre 1 y 10 |
+| rutinas | `id_usuario` | Debe existir en usuarios válidos |
+
+```
+[OK] ejercicios -> válidos: 11 | rechazados: 1
+  [X] id=12 | porcentaje_estimulo=999.9 fuera de rango [0-100]
+[OK] usuarios -> válidos: 9 | rechazados: 2
+  [X] id=10 | email="correo-invalido" formato inválido
+  [X] id=11 | edad=-5 fuera de rango [14-100]
+[OK] rutinas -> válidas: 8 | rechazadas: 2
+  [X] id=9 | id_usuario=99 no existe en usuarios válidos
+  [X] id=11 | repeticiones_logradas=-3 debe ser > 0
+```
+
+### Etapa 4 — Carga a PostgreSQL (`4_load.py`)
+
+Normaliza y carga los datos validados en 14 tablas relacionales. Usa `ON CONFLICT DO NOTHING` para idempotencia. Registros rechazados se persisten en `registros_error`.
+
+```
+[OK] Tablas verificadas
+[OK] ejercicios cargados: 11 registros
+[OK] usuarios cargados: 9 registros
+[OK] rutinas cargadas: 8 registros
+[OK] errores cargados: 5 registros
+Carga completada
+```
+
+#### Tablas generadas
+
+| Grupo | Tablas |
+|-------|--------|
+| Catálogo | `grupo_muscular`, `musculo`, `tipo_ejercicio`, `equipamiento`, `ejercicio` |
+| Usuarios | `pais`, `sexo_usuario`, `usuario`, `caracteristicas_fisicas_usuario` |
+| Rutinas | `enfoque`, `rutina`, `detalle_rutina`, `sesion_entrenamiento`, `registro_serie` |
+| Auditoría | `registros_error` |
+
+---
+
+## Datasets
+
+| Archivo | Filas | Errores intencionales |
+|---------|-------|----------------------|
+| `ejercicios.csv` | 15 | nombre vacío, porcentaje imposible, NULL string, dificultad string, duplicado |
+| `usuarios.csv` | 13 | nombre vacío, email inválido, edad negativa, peso imposible + fecha mal formato, duplicado |
+| `rutinas.csv` | 13 | usuario inexistente, fecha mal formato, repeticiones negativas, peso string, nombre vacío |
 
 ---
 
 ## Logs
 
-Cada etapa genera su propio log en la carpeta `logs/`:
+Cada etapa genera su bitácora en `logs/`:
 
-| Archivo | Etapa |
-|---|---|
-| `ingest.log` | Ingesta |
-| `transform.log` | Limpieza y transformación |
-| `validation.log` | Validación |
-| `load_database.log` | Carga a base de datos |
-
----
-
-## Dataset
-
-**Archivo:** `ejercicios.csv`  
-**Filas:** 15 registros  
-**Columnas:** `id, nombre, grupo_muscular_primario, grupo_muscular_secundario, tipo, nivel_dificultad, equipo_requerido, series_recomendadas, repeticiones_recomendadas, descanso_segundos, fuente_cientifica, notas`
-
-**Problemas conocidos en el dataset fuente:**
-
-| id | Problema |
-|---|---|
-| 13 | `nombre` vacío — registro eliminado en limpieza |
-| 4 | `series_recomendadas` vacío — eliminado en limpieza |
-| 8 | `grupo_muscular_secundario` = `'NULL'` string — normalizado |
-| 12 | `descanso_segundos` vacío — se mantiene como `NaN` |
-| 7, 15 | `fuente_cientifica` vacía — rellena con `'Sin referencia'` |
+| Archivo | Contenido |
+|---------|-----------|
+| `ingest.log` | Archivos copiados, tamaños, errores de lectura |
+| `transform.log` | IDs eliminados por etapa y motivo |
+| `validation.log` | IDs rechazados con motivo detallado por regla |
+| `load_database.log` | Registros insertados por tabla, errores de BD |
 
 ---
 
 ## Docker
 
-### Base de datos (PostgreSQL)
+### BD local
 
-```yaml
-# docker-compose.yml
-services:
-  postgres:
-    image: postgres:15
-    container_name: hypertrophia_db
-    environment:
-      POSTGRES_USER: hypertrophia
-      POSTGRES_PASSWORD: hypertrophia123
-      POSTGRES_DB: hypertrophia
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
+```bash
+docker compose up -d    # Levantar
+docker compose down     # Detener
+docker ps               # Verificar estado
 ```
 
-### Pipeline
+### Pipeline containerizado
 
-El `Dockerfile` containeriza los scripts del pipeline:
-
-```dockerfile
-FROM python:3.11-slim
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-COPY src/ ./src/
-COPY data/ ./data/
-COPY .env .
-RUN mkdir -p logs data/processed
-CMD ["python", "src/1_ingest.py"]
+```bash
+docker build -t hypertrophia .
+docker run --env-file .env hypertrophia
 ```
 
 ---
@@ -201,6 +234,7 @@ CMD ["python", "src/1_ingest.py"]
 .env
 logs/
 data/processed/
+data/errors/
 __pycache__/
 *.pyc
 ```
